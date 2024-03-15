@@ -13,7 +13,20 @@ import json
 import numpy as np
 from PIL import Image
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
-from scene.dataset_readers import CameraInfo
+from typing import NamedTuple
+# from scene.dataset_readers import CameraInfo
+
+class CameraInfo(NamedTuple):
+    uid: int
+    R: np.array
+    T: np.array
+    FovY: np.array
+    FovX: np.array
+    image: np.array
+    image_path: str
+    image_name: str
+    width: int
+    height: int
 
 
 def read_intrinsics_json(path):
@@ -65,7 +78,7 @@ def read_conf_points3D_text(path):
                 break
             line = line.strip()
             if len(line) > 0 and line[0] != "#":
-                elems = line.split()
+                elems = line.split(",")
                 xyz = np.array(tuple(map(float, elems[0:3])))
                 rgb = np.array(tuple(map(int, elems[3:6])))
                 conf = np.array(float(elems[6]))
@@ -85,17 +98,17 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
         print("Reading camera {}/{}".format(idx + 1, len(cam_extrinsics)))
 
         extr = cam_extrinsics[key]
-        intr = cam_intrinsics[extr.camera_id]
-        height = intr.height
-        width = intr.width
+        intr = cam_intrinsics[extr["camera_id"]]
+        height = intr["height"]
+        width = intr["width"]
 
-        uid = intr.id
-        R = np.reshape(extr.rflat, (3, 3))
-        T = np.transpose(extr.tvec)
+        uid = intr["id"]
+        R = np.reshape(extr["rflat"], (3, 3))
+        T = np.transpose(extr["tvec"])
 
-        if intr.model == "SIMPLE_PINHOLE" or intr.model == "PINHOLE":
-            focal_length_x = intr.focal_x
-            focal_length_y = intr.focal_y
+        if intr["model"] == "SIMPLE_PINHOLE" or intr["model"] == "PINHOLE":
+            focal_length_x = intr["focal_x"]
+            focal_length_y = intr["focal_y"]
             FovY = focal2fov(focal_length_y, height)
             FovX = focal2fov(focal_length_x, width)
         else:
@@ -103,7 +116,7 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
                 False
             ), "DUSt3R camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
 
-        image_path = os.path.join(images_folder, os.path.basename(extr.img_name))
+        image_path = os.path.join(images_folder, os.path.basename(extr["img_name"]))
         image_name = os.path.basename(image_path).split(".")[0]
         image = Image.open(image_path)
 

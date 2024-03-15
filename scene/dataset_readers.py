@@ -140,7 +140,7 @@ def readDust3rSceneInfo(path, images, eval, llffhold=8):
     cam_intrinsics = read_intrinsics_json(cameras_intrinsic_file)
     
 
-    reading_dir = "ref_imgs" if images == None else images
+    reading_dir = "ref_imgs"
     cam_infos_unsorted = readDust3rCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir))
     cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
 
