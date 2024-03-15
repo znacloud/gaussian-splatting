@@ -15,6 +15,8 @@ from PIL import Image
 from typing import NamedTuple
 from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
     read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text
+from scene.dust3r_loader import read_extrinsics_json, read_intrinsics_json, readDust3rCameras, \
+    read_conf_points3D_text
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 import numpy as np
 import json
@@ -128,6 +130,47 @@ def storePly(path, xyz, rgb):
     vertex_element = PlyElement.describe(elements, 'vertex')
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
+
+def readDust3rSceneInfo(path, images, eval, llffhold=8):
+    """Load scene data from DUSt3R inference results"""
+    
+    cameras_extrinsic_file = os.path.join(path, "camera_extrinsics.json")
+    cameras_intrinsic_file = os.path.join(path, "camera_intrinsics.json")
+    cam_extrinsics = read_extrinsics_json(cameras_extrinsic_file)
+    cam_intrinsics = read_intrinsics_json(cameras_intrinsic_file)
+    
+
+    reading_dir = "ref_imgs" if images == None else images
+    cam_infos_unsorted = readDust3rCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir))
+    cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
+
+    if eval:
+        train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
+        test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
+    else:
+        train_cam_infos = cam_infos
+        test_cam_infos = []
+
+    nerf_normalization = getNerfppNorm(train_cam_infos)
+
+    ply_path = os.path.join(path, "points3D.ply")
+    txt_path = os.path.join(path, "conf_points3D.txt")
+    if not os.path.exists(ply_path):
+        print("Converting conf_points3D.txt to .ply, will happen only the first time you open the scene.")
+        xyz, rgb, _ = read_conf_points3D_text(txt_path)
+        storePly(ply_path, xyz, rgb)
+    try:
+        pcd = fetchPly(ply_path)
+    except:
+        pcd = None
+
+    scene_info = SceneInfo(point_cloud=pcd,
+                           train_cameras=train_cam_infos,
+                           test_cameras=test_cam_infos,
+                           nerf_normalization=nerf_normalization,
+                           ply_path=ply_path)
+    return scene_info
+
 
 def readColmapSceneInfo(path, images, eval, llffhold=8):
     try:
@@ -256,5 +299,6 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
 
 sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,
-    "Blender" : readNerfSyntheticInfo
+    "Blender" : readNerfSyntheticInfo,
+    "DUSt3R": readDust3rSceneInfo,
 }
