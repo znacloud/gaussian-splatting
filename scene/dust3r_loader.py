@@ -56,6 +56,7 @@ def read_conf_points3D_text(path):
     xyzs = None
     rgbs = None
     confs = None
+    masks = None
     num_points = 0
     with open(path, "r") as fid:
         while True:
@@ -66,10 +67,10 @@ def read_conf_points3D_text(path):
             if len(line) > 0 and line[0] != "#":
                 num_points += 1
 
-
     xyzs = np.empty((num_points, 3))
     rgbs = np.empty((num_points, 3))
-    confs = np.empty((num_points, 1))
+    confs = np.empty(num_points)
+    masks = np.empty(num_points, dtype=np.uint8)
     count = 0
     with open(path, "r") as fid:
         while True:
@@ -81,14 +82,15 @@ def read_conf_points3D_text(path):
                 elems = line.split(",")
                 xyz = np.array(tuple(map(float, elems[0:3])))
                 rgb = np.array(tuple(map(int, elems[3:6])))
-                conf = np.array(float(elems[6]))
+                conf = float(elems[6])
+                mask = int(elems[7])
                 xyzs[count] = xyz
                 rgbs[count] = rgb
                 confs[count] = conf
+                masks[count] = mask
                 count += 1
 
-    return xyzs, rgbs, confs
-
+    return xyzs, rgbs, confs, masks
 
 
 def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
