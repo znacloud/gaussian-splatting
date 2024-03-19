@@ -111,7 +111,9 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
         R = np.reshape(extr["rflat"], (3, 3))
         T = np.reshape(extr["tvec"], (-1,1))
         # DUSt3R camera pose is a camera-to-world transform
-        c2w = np.concatenate((R, T), axis=1)
+        c2w = np.eye(4,4)
+        c2w[:3,:3]=R
+        c2w[:3,3:4]=T
         # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
         c2w[:3, 1:3] *= -1
 
