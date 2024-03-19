@@ -14,7 +14,9 @@ import numpy as np
 from PIL import Image
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 from typing import NamedTuple
+
 # from scene.dataset_readers import CameraInfo
+
 
 class CameraInfo(NamedTuple):
     uid: int
@@ -51,6 +53,7 @@ def read_extrinsics_json(path):
 
     images = extr_obj
     return images
+
 
 def read_conf_points3D_text(path):
     xyzs = None
@@ -106,7 +109,18 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
 
         uid = intr["id"]
         R = np.reshape(extr["rflat"], (3, 3))
-        T = np.transpose(extr["tvec"])
+        T = np.reshape(extr["tvec"], (-1,1))
+        # DUSt3R camera pose is a camera-to-world transform
+        c2w = np.concatenate((R, T), axis=1)
+        # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
+        c2w[:3, 1:3] *= -1
+
+        # get the world-to-camera transform and set R, T
+        w2c = np.linalg.inv(c2w)
+        R = np.transpose(
+            w2c[:3, :3]
+        )  # R is stored transposed due to 'glm' in CUDA code
+        T = w2c[:3, 3]
 
         if intr["model"] == "SIMPLE_PINHOLE" or intr["model"] == "PINHOLE":
             focal_length_x = intr["focal_x"]
