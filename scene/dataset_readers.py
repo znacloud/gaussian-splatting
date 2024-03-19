@@ -194,7 +194,7 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default", llffhold=8):
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
-    ply_path = os.path.join(path, "points3D.ply")
+    ply_path = os.path.join(path, f"points3D_{pcd_filter}.ply")
     txt_path = os.path.join(path, "conf_points3D.txt")
     if not os.path.exists(ply_path):
         print(

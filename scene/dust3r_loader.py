@@ -81,9 +81,9 @@ def read_conf_points3D_text(path):
             if len(line) > 0 and line[0] != "#":
                 elems = line.split(",")
                 xyz = np.array(tuple(map(float, elems[0:3])))
-                rgb = np.array(tuple(map(int, elems[3:6])))
+                rgb = np.array(tuple(map(float, elems[3:6])))
                 conf = float(elems[6])
-                mask = int(elems[7])
+                mask = int(float(elems[7]))
                 xyzs[count] = xyz
                 rgbs[count] = rgb
                 confs[count] = conf
