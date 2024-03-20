@@ -178,7 +178,7 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default", llffhold=8):
     cam_intrinsics = read_intrinsics_json(cameras_intrinsic_file)
 
     reading_dir = "ref_imgs"
-    cam_infos_unsorted = readDust3rCameras(
+    cam_infos_unsorted, first_cam_inv = readDust3rCameras(
         cam_extrinsics=cam_extrinsics,
         cam_intrinsics=cam_intrinsics,
         images_folder=os.path.join(path, reading_dir),
@@ -200,7 +200,7 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default", llffhold=8):
         print(
             "Converting conf_points3D.txt to .ply, will happen only the first time you open the scene."
         )
-        xyz, rgb, confs, masks = read_conf_points3D_text(txt_path)
+        xyz, rgb, confs, masks = read_conf_points3D_text(txt_path, first_cam_inv)
 
         if pcd_filter == "default":  # Same filter stratege as DUSt3R
             xyz = xyz[masks.astype(bool)]
