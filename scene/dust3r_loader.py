@@ -87,6 +87,7 @@ def read_conf_points3D_text(path):
                 rgb = np.array(tuple(map(float, elems[3:6])))
                 conf = float(elems[6])
                 mask = int(float(elems[7]))
+                # xyz[1:3] *= -1
                 xyzs[count] = xyz
                 rgbs[count] = rgb
                 confs[count] = conf
@@ -115,7 +116,7 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
         c2w[:3,:3]=R
         c2w[:3,3:4]=T
         # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
-        c2w[:3, 1:3] *= -1
+        # c2w[:3, 1:3] *= -1
 
         # get the world-to-camera transform and set R, T
         w2c = np.linalg.inv(c2w)
