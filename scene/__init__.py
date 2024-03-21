@@ -47,7 +47,7 @@ class Scene:
             scene_info = sceneLoadTypeCallbacks["Blender"](args.source_path, args.white_background, args.eval)
         elif os.path.exists(os.path.join(args.source_path, "conf_points3D.txt")):
             print("Found conf_points3D.json file, assuming DUSt3R data set!")
-            scene_info = sceneLoadTypeCallbacks["DUSt3R"](args.source_path, args.eval, args.pcd_filter)
+            scene_info = sceneLoadTypeCallbacks["DUSt3R"](args.source_path, args.eval, args.pcd_filter, args.pcd_scale)
         else:
             assert False, "Could not recognize scene type!"
 

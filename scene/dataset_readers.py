@@ -169,7 +169,7 @@ def storePly(path, xyz, rgb):
     ply_data.write(path)
 
 
-def readDust3rSceneInfo(path, eval, pcd_filter="default", llffhold=8):
+def readDust3rSceneInfo(path, eval, pcd_filter="default",  pcd_scale=100, llffhold=8):
     """Load scene data from DUSt3R inference results"""
 
     cameras_extrinsic_file = os.path.join(path, "camera_extrinsics.json")
@@ -178,10 +178,11 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default", llffhold=8):
     cam_intrinsics = read_intrinsics_json(cameras_intrinsic_file)
 
     reading_dir = "ref_imgs"
-    cam_infos_unsorted, first_cam_inv = readDust3rCameras(
+    cam_infos_unsorted = readDust3rCameras(
         cam_extrinsics=cam_extrinsics,
         cam_intrinsics=cam_intrinsics,
         images_folder=os.path.join(path, reading_dir),
+        scale = pcd_scale
     )
     cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)
 
@@ -200,7 +201,7 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default", llffhold=8):
         print(
             "Converting conf_points3D.txt to .ply, will happen only the first time you open the scene."
         )
-        xyz, rgb, confs, masks = read_conf_points3D_text(txt_path, first_cam_inv)
+        xyz, rgb, confs, masks = read_conf_points3D_text(txt_path, pcd_scale)
 
         if pcd_filter == "default":  # Same filter stratege as DUSt3R
             xyz = xyz[masks.astype(bool)]

@@ -126,7 +126,7 @@ def read_extrinsics_json(path):
     return images
 
 
-def read_conf_points3D_text(path, w2c):
+def read_conf_points3D_text(path, scale):
     xyzs = None
     rgbs = None
     confs = None
@@ -158,21 +158,22 @@ def read_conf_points3D_text(path, w2c):
                 rgb = np.array(tuple(map(float, elems[3:6])))
                 conf = float(elems[6])
                 mask = int(float(elems[7]))
-                # xyz[1:3] *= -1
-                xyzs[count] = xyz
+                # Need to do scaling to improve quality
+                # Same scaling should be applied to T in pose
+                xyzs[count] = xyz * scale
                 rgbs[count] = rgb
                 confs[count] = conf
                 masks[count] = mask
                 count += 1
 
-    xyzs = transform_points_to_camera_coordinate_system(xyzs, w2c)
+    # xyzs = transform_points_to_camera_coordinate_system(xyzs, w2c)
 
     return xyzs, rgbs, confs, masks
 
 
-def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
+def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder, scale):
     cam_infos = []
-    first_c2w_inv = None
+    # z_delts = [0.1, 0, 0]
     for idx, key in enumerate(cam_extrinsics):
         # the exact output you're looking for:
         print("Reading camera {}/{}".format(idx + 1, len(cam_extrinsics)))
@@ -184,23 +185,27 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
 
         uid = intr["id"]
         R = np.reshape(extr["rflat"], (3, 3))
-        T = np.reshape(extr["tvec"], (-1,1))
+
+        # Need to do scaling to improve quality
+        # Same scaling should be applied to xyz
+        T = np.reshape(extr["tvec"], (-1,1)) * scale
         # DUSt3R camera pose is a camera-to-world transform
         c2w = np.eye(4,4)
         c2w[:3,:3]=R
         c2w[:3,3:4]=T
 
+       
+    #    # Transform to first camera coordinate
+    #     if first_c2w_inv is None:
+    #         first_c2w_inv = np.linalg.inv(c2w)
+        
+    #     c2w = transform_to_first_camera_coordinate_system(c2w, first_c2w_inv)
+
         # Test quality by moving the camera distance to object
-        # c2w = move_camera_along_local_z(c2w,-0.1)
+        # c2w = move_camera_along_local_z(c2w,z_delts[idx])
 
         # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
         # c2w[:3, 1:3] *= -1
-
-       # Transform to first camera coordinate
-        if first_c2w_inv is None:
-            first_c2w_inv = np.linalg.inv(c2w)
-        
-        c2w = transform_to_first_camera_coordinate_system(c2w, first_c2w_inv)
 
         # get the world-to-camera transform and set R, T
         w2c = np.linalg.inv(c2w)
@@ -237,4 +242,4 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder):
             height=height,
         )
         cam_infos.append(cam_info)
-    return cam_infos, first_c2w_inv
+    return cam_infos
