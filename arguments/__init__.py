@@ -56,6 +56,7 @@ class ModelParams(ParamGroup):
         self.eval = False
         self.pcd_filter = "default"
         self.pcd_scale = 100
+        self.focal_mode = "default"
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):

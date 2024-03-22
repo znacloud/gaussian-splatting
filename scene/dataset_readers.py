@@ -169,7 +169,7 @@ def storePly(path, xyz, rgb):
     ply_data.write(path)
 
 
-def readDust3rSceneInfo(path, eval, pcd_filter="default",  pcd_scale=100, llffhold=8):
+def readDust3rSceneInfo(path, eval, pcd_filter="default",  pcd_scale=100, focal_mode="default", llffhold=8):
     """Load scene data from DUSt3R inference results"""
 
     cameras_extrinsic_file = os.path.join(path, "camera_extrinsics.json")
@@ -182,7 +182,8 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default",  pcd_scale=100, llffho
         cam_extrinsics=cam_extrinsics,
         cam_intrinsics=cam_intrinsics,
         images_folder=os.path.join(path, reading_dir),
-        scale = pcd_scale
+        scale = pcd_scale,
+        focal_mode=focal_mode,
     )
     cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)
 
@@ -211,7 +212,7 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default",  pcd_scale=100, llffho
         elif isinstance(pcd_filter, float):  # Use conf threshold value
             xyz = xyz[confs > pcd_filter]
             rgb = rgb[confs > pcd_filter]
-        elif isinstance(pcd_filter, str) and pcd_filter.isnumeric():
+        elif isinstance(pcd_filter, str) and pcd_filter.replace('.', '', 1).isdigit():
             xyz = xyz[confs > float(pcd_filter)]
             rgb = rgb[confs > float(pcd_filter)]
         else:

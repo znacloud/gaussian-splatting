@@ -13,9 +13,10 @@ import json
 import numpy as np
 from PIL import Image
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
-from typing import NamedTuple
+from typing import NamedTuple, Dict
 
 # from scene.dataset_readers import CameraInfo
+
 
 def move_camera_along_local_z(C, delta_z):
     """
@@ -82,12 +83,15 @@ def transform_points_to_camera_coordinate_system(points_world, camera_C_inv):
         numpy.ndarray: Transformed points in the camera's coordinate system.
     """
     # Add a homogeneous coordinate of 1 to points_world
-    points_world_homogeneous = np.hstack((points_world, np.ones((points_world.shape[0], 1))))
+    points_world_homogeneous = np.hstack(
+        (points_world, np.ones((points_world.shape[0], 1)))
+    )
 
     # Transform points to the camera's coordinate system
     points_camera = np.dot(points_world_homogeneous, np.transpose(camera_C_inv))
 
-    return points_camera[:,:-1]
+    return points_camera[:, :-1]
+
 
 class CameraInfo(NamedTuple):
     uid: int
@@ -171,9 +175,23 @@ def read_conf_points3D_text(path, scale):
     return xyzs, rgbs, confs, masks
 
 
-def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder, scale):
+def readDust3rCameras(
+    cam_extrinsics: Dict, cam_intrinsics: Dict, images_folder, scale, focal_mode
+):
     cam_infos = []
     # z_delts = [0.1, 0, 0]
+    preset_fx, preset_fy = None, None
+
+    # Calculate the average focals for the same camera model
+    if focal_mode == "mean":
+        preset_fx, preset_fy = np.mean(
+            [
+                [item[key] for key in ["focal_x", "focal_y"]]
+                for item in cam_intrinsics.values()
+            ],
+            axis=0,
+        )
+
     for idx, key in enumerate(cam_extrinsics):
         # the exact output you're looking for:
         print("Reading camera {}/{}".format(idx + 1, len(cam_extrinsics)))
@@ -188,18 +206,17 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder, scale):
 
         # Need to do scaling to improve quality
         # Same scaling should be applied to xyz
-        T = np.reshape(extr["tvec"], (-1,1)) * scale
+        T = np.reshape(extr["tvec"], (-1, 1)) * scale
         # DUSt3R camera pose is a camera-to-world transform
-        c2w = np.eye(4,4)
-        c2w[:3,:3]=R
-        c2w[:3,3:4]=T
+        c2w = np.eye(4, 4)
+        c2w[:3, :3] = R
+        c2w[:3, 3:4] = T
 
-       
-    #    # Transform to first camera coordinate
-    #     if first_c2w_inv is None:
-    #         first_c2w_inv = np.linalg.inv(c2w)
-        
-    #     c2w = transform_to_first_camera_coordinate_system(c2w, first_c2w_inv)
+        #    # Transform to first camera coordinate
+        #     if first_c2w_inv is None:
+        #         first_c2w_inv = np.linalg.inv(c2w)
+
+        #     c2w = transform_to_first_camera_coordinate_system(c2w, first_c2w_inv)
 
         # Test quality by moving the camera distance to object
         # c2w = move_camera_along_local_z(c2w,z_delts[idx])
@@ -216,8 +233,8 @@ def readDust3rCameras(cam_extrinsics, cam_intrinsics, images_folder, scale):
         T = w2c[:3, 3]
 
         if intr["model"] == "SIMPLE_PINHOLE" or intr["model"] == "PINHOLE":
-            focal_length_x = intr["focal_x"]
-            focal_length_y = intr["focal_y"]
+            focal_length_x = preset_fx if preset_fx else intr["focal_x"]
+            focal_length_y = preset_fy if preset_fy else intr["focal_y"]
             FovY = focal2fov(focal_length_y, height)
             FovX = focal2fov(focal_length_x, width)
         else:
