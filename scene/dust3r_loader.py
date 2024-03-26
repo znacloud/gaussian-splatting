@@ -264,7 +264,7 @@ def readDust3rCameras(
 
 
 # Efficient but memory-costing
-def remove_close_points(points, colors, threshold):    
+def remove_close_points(points, colors, confs, threshold):    
     # Calculate pairwise Euclidean distances
     distances = np.sqrt(np.sum((points[:, np.newaxis] - points)**2, axis=-1))
     
@@ -277,11 +277,12 @@ def remove_close_points(points, colors, threshold):
     # Filter points and colors based on the mask
     filtered_points = points[indices_to_keep]
     filtered_colors = colors[indices_to_keep]
+    confs = confs[indices_to_keep]
     
-    return filtered_points, filtered_colors
+    return filtered_points, filtered_colors, confs
 
 # Inefficient but memory-friendly
-def remove_close_points_v2(points, colors, threshold):
+def remove_close_points_v2(points, colors, confs, threshold):
     # Convert points and colors to NumPy arrays
     points = np.array(points)
     colors = np.array(colors)
@@ -312,16 +313,18 @@ def remove_close_points_v2(points, colors, threshold):
     # Filter points and colors based on indices to keep
     filtered_points = points[indices_to_keep]
     filtered_colors = colors[indices_to_keep]
+    confs = confs[indices_to_keep]
     
-    return filtered_points, filtered_colors
+    return filtered_points, filtered_colors, confs
 
 # Balance between efficiency and memory-costing
-def remove_close_points_v3(points, colors, threshold, batch_size=10000):
+def remove_close_points_v3(points, colors, confs, threshold):
     # Initialize an empty list to store indices of points to keep
     indices_to_keep = []
     
     # Calculate the total number of points
     n_points = len(points)
+    batch_size = max(1,int(100_000_000 / n_points))
     
     # Iterate over batches of points
     for start in range(0, n_points, batch_size):
@@ -345,20 +348,24 @@ def remove_close_points_v3(points, colors, threshold, batch_size=10000):
     # Filter points and colors based on indices to keep
     filtered_points = points[indices_to_keep]
     filtered_colors = colors[indices_to_keep]
+    filter_confs = confs[indices_to_keep]
     
-    return filtered_points, filtered_colors
+    return filtered_points, filtered_colors, filter_confs
 
 # Torch Version
-def remove_close_points_v4(points, colors, threshold, batch_size=1000):
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+def remove_close_points_v4(points, colors, confs, threshold):
     # Convert points and colors to PyTorch tensors
-    points = torch.tensor(points, dtype=torch.float32, device='cuda')
-    colors = torch.tensor(colors, dtype=torch.float32, device='cuda')
+    points = torch.tensor(points, dtype=torch.float32, device=device)
+    colors = torch.tensor(colors, dtype=torch.float32, device=device)
     
     # Initialize an empty list to store indices of points to keep
     indices_to_keep = []
     
     # Calculate the total number of points
     n_points = len(points)
+    batch_size = max(1,int(100_000_000 / n_points))
     
     # Iterate over batches of points
     for start in range(0, n_points, batch_size):
@@ -371,17 +378,18 @@ def remove_close_points_v4(points, colors, threshold, batch_size=1000):
         distances = torch.norm(batch_points[:, None, :] - points, dim=-1)
         
         # Exclude distances within the batch and distances to self
-        distances[torch.triu_indices(batch_size, n_points, offset=start)] = float('inf')
+        indices = torch.triu_indices(batch_size, n_points, offset=start)
+        distances[indices[0], indices[1]]= float('inf')
         
         # Find points in the batch that are far enough from other points
         mask = torch.all(distances >= threshold, dim=1)
-        
+
         # Update indices to keep
-        indices_to_keep.extend(torch.arange(start, end)[mask].cpu().numpy())
+        indices_to_keep.extend(torch.arange(start, end).cpu()[mask].cpu().numpy())
     
     # Filter points and colors based on indices to keep
     filtered_points = points[indices_to_keep]
     filtered_colors = colors[indices_to_keep]
+    confs = confs[indices_to_keep]
     
-    return filtered_points.cpu().numpy(), filtered_colors.cpu().numpy()
-
+    return filtered_points.cpu().numpy(), filtered_colors.cpu().numpy(), confs

@@ -28,7 +28,7 @@ from scene.dust3r_loader import (
     read_intrinsics_json,
     readDust3rCameras,
     read_conf_points3D_text,
-    remove_close_points_v3
+    remove_close_points_v4
 ,
 )
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
@@ -201,41 +201,46 @@ def readDust3rSceneInfo(
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
-    ply_path = os.path.join(path, f"points3D_{"_".join(pcd_filters)}.ply")
+    ply_path = os.path.join(path, f"points3D_{'_'.join(pcd_filters)}.ply")
     txt_path = os.path.join(path, "conf_points3D.txt")
     if not os.path.exists(ply_path):
         iter_start = torch.cuda.Event(enable_timing=True)
         iter_end = torch.cuda.Event(enable_timing=True)
         print(
-            f"Converting conf_points3D.txt to points3D_{"_".join(pcd_filters)}.ply, will happen only the first time you open the scene."
+            f"Converting conf_points3D.txt to points3D_{'_'.join(pcd_filters)}.ply, will happen only the first time you open the scene."
         )
         iter_start.record()
         xyz, rgb, confs, masks = read_conf_points3D_text(txt_path, pcd_scale)
-
+        
         for pcd_filter in pcd_filters:
-            print(f"Inital number of points:{len(xyz)}, filtering with '{pcd_filter}'")
+            total = len(xyz)
+            print(f"Inital number of points:{total}, filtering with '{pcd_filter}'")
             if pcd_filter == "default":  # Same filter stratege as DUSt3R
                 xyz = xyz[masks.astype(bool)]
                 rgb = rgb[masks.astype(bool)]
+                confs = confs[masks.astype(bool)]
             elif pcd_filter == "none":  # Don't filter any points
                 pass
             elif pcd_filter.startswith("rand_"):  # Random Sample
-                n = int(pcd_filter[len("rand_") :])
-                sample_indices = np.random.choice(len(xyz), n)
+                n = min(total,int(pcd_filter[len("rand_") :]))
+                sample_indices = np.random.choice(total, n)
                 xyz = xyz[sample_indices]
                 rgb = rgb[sample_indices]
+                confs = confs[sample_indices]
             elif pcd_filter.startswith("top_"):  # Select the top n according to confs
-                n = int(pcd_filter[len("top_") :])
+                n = min(total,int(pcd_filter[len("top_") :]))
                 sample_indices = np.argpartition(confs, -n)[-n:]
                 xyz = xyz[sample_indices]
                 rgb = rgb[sample_indices]
+                confs = confs[sample_indices]
             elif pcd_filter.startswith("dist_"):  # Remove close points
                 thres = float(pcd_filter[len("dist_") :])
-                xyz, rgb = remove_close_points_v3(xyz, rgb, thres)
+                xyz, rgb, confs = remove_close_points_v4(xyz, rgb, confs, thres)
             elif pcd_filter.startswith("conf_"):
                 thres = np.log(float(pcd_filter[len("conf_"):]))
                 xyz = xyz[confs > thres]
                 rgb = rgb[confs > thres]
+                confs = confs[confs > thres]
             else:
                 print(f"Unknow pcd filter value, do not filter points, {pcd_filter=}")
 

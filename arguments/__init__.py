@@ -29,11 +29,17 @@ class ParamGroup:
             if shorthand:
                 if t == bool:
                     group.add_argument("--" + key, ("-" + key[0:1]), default=value, action="store_true")
+                elif t == list:
+                    t = type(value[0])
+                    group.add_argument("--" + key, nargs="+", type=t, default=value)
                 else:
                     group.add_argument("--" + key, ("-" + key[0:1]), default=value, type=t)
             else:
                 if t == bool:
                     group.add_argument("--" + key, default=value, action="store_true")
+                elif t == list:
+                    t = type(value[0])
+                    group.add_argument("--" + key, nargs="+", type=t, default=value)
                 else:
                     group.add_argument("--" + key, default=value, type=t)
 
