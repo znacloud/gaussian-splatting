@@ -54,7 +54,7 @@ class ModelParams(ParamGroup):
         self._white_background = False
         self.data_device = "cuda"
         self.eval = False
-        self.pcd_filter = "default"
+        self.pcd_filters = ["default"]
         self.pcd_scale = 100
         self.focal_mode = "default"
         super().__init__(parser, "Loading Parameters", sentinel)

@@ -10,6 +10,7 @@
 
 import os
 import json
+import torch
 import numpy as np
 from PIL import Image
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
@@ -260,3 +261,127 @@ def readDust3rCameras(
         )
         cam_infos.append(cam_info)
     return cam_infos
+
+
+# Efficient but memory-costing
+def remove_close_points(points, colors, threshold):    
+    # Calculate pairwise Euclidean distances
+    distances = np.sqrt(np.sum((points[:, np.newaxis] - points)**2, axis=-1))
+    
+    # Mask to identify points that are too close to each other
+    mask = np.triu(distances < threshold, k=1)
+    
+    # Indices of points to keep
+    indices_to_keep = ~np.any(mask, axis=0)
+    
+    # Filter points and colors based on the mask
+    filtered_points = points[indices_to_keep]
+    filtered_colors = colors[indices_to_keep]
+    
+    return filtered_points, filtered_colors
+
+# Inefficient but memory-friendly
+def remove_close_points_v2(points, colors, threshold):
+    # Convert points and colors to NumPy arrays
+    points = np.array(points)
+    colors = np.array(colors)
+    
+    # Initialize an empty list to store indices of points to keep
+    indices_to_keep = []
+    
+    # Iterate over each point
+    n = len(points)
+    for i in range(n):
+        # Flag to determine if the point should be kept
+        keep_point = True
+        point_i = points[i]
+        
+        # Check distances between the current point and all other points
+        for j in range(i):
+            point_j = points[j]
+            # Compute Euclidean distance between point_i and point_j
+            distance = np.linalg.norm(point_i - point_j)
+            if distance < threshold:
+                # If distance is less than threshold, don't keep the point
+                keep_point = False
+                break  # No need to check other points
+                
+        if keep_point:
+            indices_to_keep.append(i)
+    
+    # Filter points and colors based on indices to keep
+    filtered_points = points[indices_to_keep]
+    filtered_colors = colors[indices_to_keep]
+    
+    return filtered_points, filtered_colors
+
+# Balance between efficiency and memory-costing
+def remove_close_points_v3(points, colors, threshold, batch_size=10000):
+    # Initialize an empty list to store indices of points to keep
+    indices_to_keep = []
+    
+    # Calculate the total number of points
+    n_points = len(points)
+    
+    # Iterate over batches of points
+    for start in range(0, n_points, batch_size):
+        end = min(start + batch_size, n_points)
+        
+        # Extract batch of points
+        batch_points = points[start:end]
+        
+        # Compute pairwise distances between batch points and all points
+        distances = np.linalg.norm(batch_points[:, np.newaxis, :] - points, axis=-1)
+        
+        # Adjust distances indices to exclude distances within the batch and distances to self
+        distances[np.triu_indices(batch_size, k=start,m=n_points)] = np.inf
+        
+        # Find points in the batch that are far enough from other points
+        mask = np.all(distances >= threshold, axis=1)
+        
+        # Update indices to keep
+        indices_to_keep.extend(np.arange(start, end)[mask])
+    
+    # Filter points and colors based on indices to keep
+    filtered_points = points[indices_to_keep]
+    filtered_colors = colors[indices_to_keep]
+    
+    return filtered_points, filtered_colors
+
+# Torch Version
+def remove_close_points_v4(points, colors, threshold, batch_size=1000):
+    # Convert points and colors to PyTorch tensors
+    points = torch.tensor(points, dtype=torch.float32, device='cuda')
+    colors = torch.tensor(colors, dtype=torch.float32, device='cuda')
+    
+    # Initialize an empty list to store indices of points to keep
+    indices_to_keep = []
+    
+    # Calculate the total number of points
+    n_points = len(points)
+    
+    # Iterate over batches of points
+    for start in range(0, n_points, batch_size):
+        end = min(start + batch_size, n_points)
+        
+        # Extract batch of points
+        batch_points = points[start:end]
+        
+        # Compute pairwise distances between batch points and all points
+        distances = torch.norm(batch_points[:, None, :] - points, dim=-1)
+        
+        # Exclude distances within the batch and distances to self
+        distances[torch.triu_indices(batch_size, n_points, offset=start)] = float('inf')
+        
+        # Find points in the batch that are far enough from other points
+        mask = torch.all(distances >= threshold, dim=1)
+        
+        # Update indices to keep
+        indices_to_keep.extend(torch.arange(start, end)[mask].cpu().numpy())
+    
+    # Filter points and colors based on indices to keep
+    filtered_points = points[indices_to_keep]
+    filtered_colors = colors[indices_to_keep]
+    
+    return filtered_points.cpu().numpy(), filtered_colors.cpu().numpy()
+

@@ -11,6 +11,7 @@
 
 import os
 import sys
+import torch
 from PIL import Image
 from typing import NamedTuple
 from scene.colmap_loader import (
@@ -27,6 +28,8 @@ from scene.dust3r_loader import (
     read_intrinsics_json,
     readDust3rCameras,
     read_conf_points3D_text,
+    remove_close_points_v3
+,
 )
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 import numpy as np
@@ -169,7 +172,9 @@ def storePly(path, xyz, rgb):
     ply_data.write(path)
 
 
-def readDust3rSceneInfo(path, eval, pcd_filter="default",  pcd_scale=100, focal_mode="default", llffhold=8):
+def readDust3rSceneInfo(
+    path, eval, pcd_filters=["default"], pcd_scale=100, focal_mode="default", llffhold=8
+):
     """Load scene data from DUSt3R inference results"""
 
     cameras_extrinsic_file = os.path.join(path, "camera_extrinsics.json")
@@ -182,7 +187,7 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default",  pcd_scale=100, focal_
         cam_extrinsics=cam_extrinsics,
         cam_intrinsics=cam_intrinsics,
         images_folder=os.path.join(path, reading_dir),
-        scale = pcd_scale,
+        scale=pcd_scale,
         focal_mode=focal_mode,
     )
     cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)
@@ -196,29 +201,51 @@ def readDust3rSceneInfo(path, eval, pcd_filter="default",  pcd_scale=100, focal_
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
-    ply_path = os.path.join(path, f"points3D_{pcd_filter}.ply")
+    ply_path = os.path.join(path, f"points3D_{"_".join(pcd_filters)}.ply")
     txt_path = os.path.join(path, "conf_points3D.txt")
     if not os.path.exists(ply_path):
+        iter_start = torch.cuda.Event(enable_timing=True)
+        iter_end = torch.cuda.Event(enable_timing=True)
         print(
-            "Converting conf_points3D.txt to .ply, will happen only the first time you open the scene."
+            f"Converting conf_points3D.txt to points3D_{"_".join(pcd_filters)}.ply, will happen only the first time you open the scene."
         )
+        iter_start.record()
         xyz, rgb, confs, masks = read_conf_points3D_text(txt_path, pcd_scale)
 
-        if pcd_filter == "default":  # Same filter stratege as DUSt3R
-            xyz = xyz[masks.astype(bool)]
-            rgb = rgb[masks.astype(bool)]
-        elif pcd_filter == "none":  # Don't filter any points
-            pass
-        elif isinstance(pcd_filter, float):  # Use conf threshold value
-            xyz = xyz[confs > pcd_filter]
-            rgb = rgb[confs > pcd_filter]
-        elif isinstance(pcd_filter, str) and pcd_filter.replace('.', '', 1).isdigit():
-            xyz = xyz[confs > float(pcd_filter)]
-            rgb = rgb[confs > float(pcd_filter)]
-        else:
-            print(f"Unknow pcd filter value, do not filter points, {pcd_filter=}")
+        for pcd_filter in pcd_filters:
+            print(f"Inital number of points:{len(xyz)}, filtering with '{pcd_filter}'")
+            if pcd_filter == "default":  # Same filter stratege as DUSt3R
+                xyz = xyz[masks.astype(bool)]
+                rgb = rgb[masks.astype(bool)]
+            elif pcd_filter == "none":  # Don't filter any points
+                pass
+            elif pcd_filter.startswith("rand_"):  # Random Sample
+                n = int(pcd_filter[len("rand_") :])
+                sample_indices = np.random.choice(len(xyz), n)
+                xyz = xyz[sample_indices]
+                rgb = rgb[sample_indices]
+            elif pcd_filter.startswith("top_"):  # Select the top n according to confs
+                n = int(pcd_filter[len("top_") :])
+                sample_indices = np.argpartition(confs, -n)[-n:]
+                xyz = xyz[sample_indices]
+                rgb = rgb[sample_indices]
+            elif pcd_filter.startswith("dist_"):  # Remove close points
+                thres = float(pcd_filter[len("dist_") :])
+                xyz, rgb = remove_close_points_v3(xyz, rgb, thres)
+            elif pcd_filter.startswith("conf_"):
+                thres = np.log(float(pcd_filter[len("conf_"):]))
+                xyz = xyz[confs > thres]
+                rgb = rgb[confs > thres]
+            else:
+                print(f"Unknow pcd filter value, do not filter points, {pcd_filter=}")
+
+            print(f"Filter completed, number of filtered points: {len(xyz)}")
 
         storePly(ply_path, xyz, rgb)
+
+        iter_end.record()
+        print(f"Filter elaspsed time={iter_start.elapsed_time(iter_end)}")
+        
     try:
         pcd = fetchPly(ply_path)
     except:
