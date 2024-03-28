@@ -324,7 +324,7 @@ def remove_close_points_v3(points, colors, confs, threshold):
     
     # Calculate the total number of points
     n_points = len(points)
-    batch_size = max(1,int(100_000_000 / n_points))
+    batch_size = max(1,int(200_000_000 / n_points))
     
     # Iterate over batches of points
     for start in range(0, n_points, batch_size):
@@ -365,7 +365,7 @@ def remove_close_points_v4(points, colors, confs, threshold):
     
     # Calculate the total number of points
     n_points = len(points)
-    batch_size = max(1,int(100_000_000 / n_points))
+    batch_size = max(1,int(200_000_000 / n_points))
     
     # Iterate over batches of points
     for start in range(0, n_points, batch_size):
@@ -382,7 +382,7 @@ def remove_close_points_v4(points, colors, confs, threshold):
         distances[indices[0], indices[1]]= float('inf')
         
         # Find points in the batch that are far enough from other points
-        mask = torch.all(distances >= threshold, dim=1)
+        mask = torch.all(distances >= threshold, dim=1).cpu()
 
         # Update indices to keep
         indices_to_keep.extend(torch.arange(start, end).cpu()[mask].cpu().numpy())
