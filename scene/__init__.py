@@ -42,7 +42,7 @@ class Scene:
         self.novel_cameras = {}
 
         if os.path.exists(os.path.join(args.source_path, "sparse")):
-            scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval)
+            scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval,llffhold=8,nv_angle=args.nv_angle)
         elif os.path.exists(os.path.join(args.source_path, "transforms_train.json")):
             print("Found transforms_train.json file, assuming Blender data set!")
             scene_info = sceneLoadTypeCallbacks["Blender"](args.source_path, args.white_background, args.eval)
@@ -68,14 +68,11 @@ class Scene:
 
             # Dump Novel Cameras
             json_cams = []
-            camlist = []
             if scene_info.novel_cameras:
-                camlist.extend(scene_info.novel_cameras)
-
-                for id, cam in enumerate(camlist):
+                for id, cam in enumerate(scene_info.novel_cameras):
                     json_cams.append(camera_to_JSON(id, cam))
                 
-                with open(os.path.join(self.model_path, "novel_cameras.json"), 'w') as file:
+                with open(os.path.join(self.model_path, f"novel_cameras_d({args.nv_angle:.1f}).json"), 'w') as file:
                     json.dump(json_cams, file)
 
 

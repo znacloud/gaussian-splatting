@@ -63,6 +63,9 @@ class ModelParams(ParamGroup):
         self.pcd_filters = ["default"]
         self.pcd_scale = 100
         self.focal_mode = "default"
+        # angle in degree used to generate new camra pose by moving around scene center
+        # If None or 0, no new camera will be created 
+        self.nv_angle = 0
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):

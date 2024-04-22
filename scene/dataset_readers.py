@@ -86,14 +86,15 @@ def getNerfppNorm(cam_info):
 
     return {"translate": translate, "radius": radius}
 
-def createNovelCameras(cam_infos,nerf_normalization, angle=np.pi/12):
+def createNovelCameras(cam_infos,nerf_normalization, degree=5.0): # 5 degree
     nv_cam_infos = []
     for cam in cam_infos:
         W2C = getWorld2View(cam.R, cam.T)
         C2W = np.linalg.inv(W2C)
         scene_radius = -nerf_normalization["radius"]
         # currently we only move camera positioin along its x-axis direction
-        cv_delt_x =  np.tan(angle)*scene_radius
+        radian = degree/180.0*np.pi
+        cv_delt_x =  np.tan(radian)*scene_radius
         # update camera pose
         C2W = move_camera_along_local_x(C2W, cv_delt_x)
         W2C = np.linalg.inv(C2W)
@@ -302,7 +303,7 @@ def readDust3rSceneInfo(
     return scene_info
 
 
-def readColmapSceneInfo(path, images, eval, llffhold=8):
+def readColmapSceneInfo(path, images, eval, llffhold=8, nv_angle=0):
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
@@ -332,7 +333,9 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
     # Create Novel View Camera by slightly adjusting existing cameras' position and angle
-    novel_cam_infos = createNovelCameras(cam_infos,nerf_normalization)
+    novel_cam_infos = []
+    if nv_angle:
+        novel_cam_infos = createNovelCameras(cam_infos,nerf_normalization, nv_angle)
 
     ply_path = os.path.join(path, "sparse/0/points3D.ply")
     bin_path = os.path.join(path, "sparse/0/points3D.bin")
