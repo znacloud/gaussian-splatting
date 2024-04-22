@@ -31,7 +31,8 @@ from scene.dust3r_loader import (
     remove_close_points_v4
 ,
 )
-from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
+from utils.graphics_utils import getWorld2View, getWorld2View2, focal2fov, fov2focal
+from utils.camera_utils import move_camera_along_local_x
 import numpy as np
 import json
 from pathlib import Path
@@ -57,6 +58,7 @@ class SceneInfo(NamedTuple):
     point_cloud: BasicPointCloud
     train_cameras: list
     test_cameras: list
+    novel_cameras: list
     nerf_normalization: dict
     ply_path: str
 
@@ -83,6 +85,39 @@ def getNerfppNorm(cam_info):
     translate = -center
 
     return {"translate": translate, "radius": radius}
+
+def createNovelCameras(cam_infos,nerf_normalization, angle=np.pi/12):
+    nv_cam_infos = []
+    for cam in cam_infos:
+        W2C = getWorld2View(cam.R, cam.T)
+        C2W = np.linalg.inv(W2C)
+        scene_radius = -nerf_normalization["radius"]
+        # currently we only move camera positioin along its x-axis direction
+        cv_delt_x =  np.tan(angle)*scene_radius
+        # update camera pose
+        C2W = move_camera_along_local_x(C2W, cv_delt_x)
+        W2C = np.linalg.inv(C2W)
+        R = np.transpose(
+            W2C[:3, :3]
+        )  # R is stored transposed due to 'glm' in CUDA code
+        T = W2C[:3, 3]
+
+        cam_info = CameraInfo(
+            uid=cam.uid,
+            R=R,
+            T=T,
+            FovY=cam.FovY,
+            FovX=cam.FovX,
+            image=cam.image,
+            image_path=cam.image_path,
+            image_name=cam.image_name,
+            width=cam.width,
+            height=cam.height,
+        )
+        nv_cam_infos.append(cam_info)
+
+    return nv_cam_infos
+
 
 
 def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
@@ -260,6 +295,7 @@ def readDust3rSceneInfo(
         point_cloud=pcd,
         train_cameras=train_cam_infos,
         test_cameras=test_cam_infos,
+        novel_cameras=[],
         nerf_normalization=nerf_normalization,
         ply_path=ply_path,
     )
@@ -295,6 +331,9 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
+    # Create Novel View Camera by slightly adjusting existing cameras' position and angle
+    novel_cam_infos = createNovelCameras(cam_infos,nerf_normalization)
+
     ply_path = os.path.join(path, "sparse/0/points3D.ply")
     bin_path = os.path.join(path, "sparse/0/points3D.bin")
     txt_path = os.path.join(path, "sparse/0/points3D.txt")
@@ -316,6 +355,7 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
         point_cloud=pcd,
         train_cameras=train_cam_infos,
         test_cameras=test_cam_infos,
+        novel_cameras= novel_cam_infos,
         nerf_normalization=nerf_normalization,
         ply_path=ply_path,
     )
@@ -420,6 +460,7 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
         point_cloud=pcd,
         train_cameras=train_cam_infos,
         test_cameras=test_cam_infos,
+        novel_cameras=[],
         nerf_normalization=nerf_normalization,
         ply_path=ply_path,
     )

@@ -80,3 +80,36 @@ def camera_to_JSON(id, camera : Camera):
         'fx' : fov2focal(camera.FovX, camera.width)
     }
     return camera_entry
+
+
+
+def move_camera_along_local_x(C, delta_x):
+    """
+    Move the camera along its local X-axis.
+
+    Args:
+        C (numpy.ndarray): Original camera-to-world pose matrix.
+        delta_x (float): Amount by which to move the camera along its local X-axis.
+
+    Returns:
+        numpy.ndarray: Updated camera-to-world pose matrix.
+    """
+    # Decompose the camera-to-world matrix into translation, rotation, and scale
+    translation = C[:3, 3]  # Extract translation component
+    rotation = C[:3, :3]  # Extract rotation component
+
+    # Get the local Z-axis in world coordinates
+    local_x_world = rotation[:, 0]
+
+    # Transform the translation along the local Z-axis to world coordinates
+    translation_delta_world = local_x_world * delta_x
+
+    # Update the translation in world coordinates
+    new_translation = translation + translation_delta_world
+
+    # Recombine the updated translation with the original rotation and scale
+    updated_C = np.eye(4)
+    updated_C[:3, :3] = rotation
+    updated_C[:3, 3] = new_translation
+
+    return updated_C

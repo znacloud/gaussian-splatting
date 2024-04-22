@@ -39,6 +39,7 @@ class Scene:
 
         self.train_cameras = {}
         self.test_cameras = {}
+        self.novel_cameras = {}
 
         if os.path.exists(os.path.join(args.source_path, "sparse")):
             scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval)
@@ -65,6 +66,19 @@ class Scene:
             with open(os.path.join(self.model_path, "cameras.json"), 'w') as file:
                 json.dump(json_cams, file)
 
+            # Dump Novel Cameras
+            json_cams = []
+            camlist = []
+            if scene_info.novel_cameras:
+                camlist.extend(scene_info.novel_cameras)
+
+                for id, cam in enumerate(camlist):
+                    json_cams.append(camera_to_JSON(id, cam))
+                
+                with open(os.path.join(self.model_path, "novel_cameras.json"), 'w') as file:
+                    json.dump(json_cams, file)
+
+
         if shuffle:
             random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffling
             random.shuffle(scene_info.test_cameras)  # Multi-res consistent random shuffling
@@ -76,6 +90,9 @@ class Scene:
             self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale, args)
             print("Loading Test Cameras")
             self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale, args)
+            print("Loading Novel Cameras")
+            self.novel_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.novel_cameras, resolution_scale, args)
+
 
         if self.loaded_iter:
             self.gaussians.load_ply(os.path.join(self.model_path,
@@ -94,3 +111,6 @@ class Scene:
 
     def getTestCameras(self, scale=1.0):
         return self.test_cameras[scale]
+    
+    def getNovelCameras(self, scale=1.0):
+        return self.novel_cameras[scale]
