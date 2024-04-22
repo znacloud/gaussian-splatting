@@ -28,7 +28,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
 
-    for idx, view in enumerate(tqdm(views, desc="Rendering progress")):
+    for idx, view in enumerate(tqdm(views, desc=f"[{name}]Rendering progress")):
         rendering = render(view, gaussians, pipeline, background)["render"]
         gt = view.original_image[0:3, :, :]
         torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
@@ -57,7 +57,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
 if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Testing script parameters")
-    model = ModelParams(parser, sentinel=True)
+    model = ModelParams(parser, sentinel=False)
     pipeline = PipelineParams(parser)
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
