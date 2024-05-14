@@ -88,21 +88,33 @@ def evaluate(model_paths, group_length, novel_paths):
                 )
 
                 # select images from novel paths based on the largest_items
-                selected_img_names = [item.keys()[0] for item in largest_items]
+                selected_img_names = [list(item.keys())[0] for item in largest_items]
                 for novel_dir in novel_paths:
                     novel_method_dir = Path(scene_dir) / novel_dir / method
                     novel_render_dir = novel_method_dir / "renders"
-                    novel_select_dir = novel_method_dir / f"selected_g{group_length}"
+                    novel_train_dir = (
+                        Path(scene_dir) / f"{method}-{novel_dir}-train-g{group_length}"
+                    )
 
-                    novel_select_dir.mkdir(parents=True, exist_ok=True)
+                    novel_train_dir.mkdir(parents=True, exist_ok=True)
 
                     # Copy the file to the destination directory
                     for img_name in selected_img_names:
-                        shutil.copy(novel_render_dir / img_name, novel_select_dir)
+                        name, _, suffix = img_name.rpartition(".")
+                        src = novel_render_dir / img_name
+                        dst = novel_train_dir / f"{name}_nv.{suffix}"
+                        print("Copy file: ", src)
+                        shutil.copy(src, dst)
+
+                        src = renders_dir / img_name
+                        dst = novel_train_dir / img_name
+                        print("Copy file: ", src)
+                        shutil.copy(src, dst)
 
             with open(scene_dir + "/per_view.json", "w") as fp:
                 json.dump(per_view_dict[scene_dir], fp, indent=True)
-        except:
+        except Exception as e:
+            print(e)
             print("Unable to compute metrics for model", scene_dir)
 
 
